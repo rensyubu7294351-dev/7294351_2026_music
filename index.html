@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <style>
+        /* 基本のスタイル */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+        }
+
+        /* 背景画像の設定 */
+        body {
+            
+            background-image: url('./images/background.jpg'); 
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* コンテンツを囲むカード（半透明） */
+        .container {
+            background: rgba(255, 255, 255, 0.85); /* 白の85%透過 */
+            backdrop-filter: blur(10px); /* 背景をぼかす（おしゃれに見えます） */
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        /* オーディオプレイヤーの幅調整 */
+        audio {
+            width: 100%;
+            margin-bottom: 25px;
+        }
+
+        /* ダウンロードボタンのデザイン */
+        .download-btn {
+            display: inline-block;
+            background-color: #00B900; /* LINEカラー風の緑 */
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: all 0.3s ease; /* アニメーションを滑らかに */
+            width: 80%;
+            box-sizing: border-box; /* パディングを含めた幅計算 */
+        }
+
+        .download-btn:hover {
+            background-color: #009900;
+        }
+
+        /* ボタンを押した瞬間のへこみアクション */
+        .download-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* クリック後」のスタイル */
+        .download-btn.clicked {
+            background-color: #6c757d; /* グレーに変更して処理中感を出す */
+            pointer-events: none; /* 連打防止 */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>曲再生</h1>
+        
+        <audio src="https://zoicuylrpfwlqjduturl.supabase.co/storage/v1/object/public/7294351-2026Project/Shichifuku_2026_2mix_1.mp3" controls></audio>
+
+        <br>
+
+        <a href="https://zoicuylrpfwlqjduturl.supabase.co/storage/v1/object/public/7294351-2026Project/Shichifuku_2026_2mix_1.mp3" download="Shichifuku_2026_2mix_1.mp3" class="download-btn" id="downloadBtn">
+            曲をダウンロードする
+        </a>
+    </div>
+
+    <script>
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        downloadBtn.addEventListener('click', function() {
+            
+            const originalText = this.innerText;
+
+            // ボタンの見た目とテキストを変更
+            this.innerText = "ダウンロードを開始しました！";
+            this.classList.add('clicked');
+
+            // ２秒後に元の状態に戻す
+            setTimeout(() => {
+                this.innerText = originalText;
+                this.classList.remove('clicked');
+            },2000);
+        });
+    </script>
+
+</body>
+</html>
