@@ -36,4 +36,5 @@ https://rensyubu7294351-dev.github.io/7294351_2026_music/
 
 ---
 
-設定が完了したら教えてください。そのURLを使ってダウンロードボタンを外部ブラウザ起動対応に修正したindex.htmlを作成します。
+<img width="703" height="237" alt="スクリーンショット 2026-04-26 10 02 07" src="https://github.com/user-attachments/assets/bafeecb9-d11e-4503-8696-a28ac3d9cf1a" />
+
