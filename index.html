@@ -16,8 +16,16 @@
             font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
         }
 
-        /* background-attachment: fixed はiOS Safariで動作しないため、
-           擬似要素を使った背景固定テクニックに変更 */
+        /*
+         * [背景の固定表示について]
+         * background-attachment: fixed は以下の環境で問題が起きるため使用しない
+         *   - iOS Safari: 背景がスクロールにつれてズレる・拡大される既知のバグ
+         *   - Android Chrome: 一部バージョンで正常に描画されないケースあり
+         *   - Edge (モバイル): Chromiumベースだが描画タイミングによりちらつく場合あり
+         *
+         * 対策: body::before 擬似要素に position:fixed で背景を固定する方式に変更。
+         * これはすべての主要ブラウザで安定して動作する手法。
+         */
         body::before {
             content: '';
             position: fixed;
@@ -27,22 +35,40 @@
             height: 100%;
             background-image: url('./images/background.jpg');
             background-size: cover;
-            background-position: center;
+            background-position: center center;
             z-index: -1;
+            /* Android Chrome の GPU合成レイヤー最適化 */
+            will-change: transform;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
         }
 
         body {
             min-height: 100%;
+            min-height: -webkit-fill-available; /* iOS Safari のアドレスバー分のズレを補正 */
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
 
+        /* iOS Safari のビューポート高さバグへの追加対応 */
+        html {
+            height: -webkit-fill-available;
+        }
+
         .container {
             background: rgba(255, 255, 255, 0.85);
+
+            /*
+             * [backdrop-filter について]
+             * - Chrome/Edge: そのまま動作
+             * - Safari (iOS含む): -webkit- プレフィックスが必要なため両方記述
+             * - Firefox: 設定によっては無効のことがあるが、その場合は背景色で代替される
+             */
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px); /* Safari対応 */
+
             padding: 30px;
             border-radius: 20px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -57,6 +83,11 @@
             margin-bottom: 20px;
         }
 
+        /*
+         * [audio要素について]
+         * HTML5のaudio要素はChrome/Edge/Safari/Firefox/Android全ブラウザ対応済み。
+         * autoplayはモバイルブラウザ全般でブロックされるため使用しない(controls のみ)。
+         */
         audio {
             width: 100%;
             margin-bottom: 25px;
@@ -72,6 +103,22 @@
             font-weight: bold;
             transition: all 0.3s ease;
             width: 80%;
+
+            /*
+             * [タップ時のハイライト除去]
+             * Android Chrome / iOS Safari ではタップ時に青・グレーのハイライトが出るため除去
+             */
+            -webkit-tap-highlight-color: transparent;
+
+            /* Android Chrome でのテキスト選択防止 */
+            -webkit-user-select: none;
+            user-select: none;
+
+            /* iOS Safari でボタンが押しつぶされる見た目になるのを防ぐ */
+            -webkit-appearance: none;
+
+            /* テキストの途中改行を防ぐ */
+            white-space: nowrap;
         }
 
         .download-btn:hover {
@@ -80,6 +127,7 @@
 
         .download-btn:active {
             transform: scale(0.95);
+            -webkit-transform: scale(0.95);
         }
 
         .download-btn.clicked {
@@ -92,12 +140,29 @@
 
     <div class="container">
         <h1>曲再生</h1>
-        
-        <audio src="./Shichifuku_2026.mp3" controls></audio>
+
+        <audio controls>
+            <!--
+                sourceを複数記述することで、ブラウザが対応フォーマットを自動選択する。
+                現状MP3のみだが、将来的にogg等を追加する場合もここに追記するだけでOK。
+                MP3はChrome/Edge/Safari/Firefox/Android全ブラウザ対応済み。
+            -->
+            <source src="./Shichifuku_2026.mp3" type="audio/mpeg">
+            お使いのブラウザは音声再生に対応していません。
+        </audio>
 
         <br>
 
-        <a href="./Shichifuku_2026.mp3" download="Shichifuku_2026.mp3" class="download-btn" id="downloadBtn">
+        <!--
+            [downloadリンクについて]
+            download属性はChrome/Edge/Firefox/Android Chromeで有効。
+            iOS Safariはdownload属性を無視して新しいタブで開く仕様のため、
+            JavaScriptによるフォールバックをスクリプト側で対応。
+        -->
+        <a href="./Shichifuku_2026.mp3"
+           download="Shichifuku_2026.mp3"
+           class="download-btn"
+           id="downloadBtn">
             曲をダウンロードする
         </a>
     </div>
@@ -105,16 +170,59 @@
     <script>
         const downloadBtn = document.getElementById('downloadBtn');
 
-        downloadBtn.addEventListener('click', function() {
-            const originalText = this.innerText;
-            this.innerText = "ダウンロードを開始しました！";
-            this.classList.add('clicked');
+        /*
+         * iOS Safari判定
+         * iOS SafariはHTMLのdownload属性に非対応のため、
+         * Blob経由でのダウンロードにフォールバックする。
+         * Chrome/Edge/Android Chromeは通常のdownload属性で動作するためそのまま。
+         */
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-            setTimeout(() => {
-                this.innerText = originalText;
-                this.classList.remove('clicked');
-            }, 2000);
-        });
+        if (isIOS || isSafari) {
+            downloadBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                const originalText = this.innerText;
+                this.innerText = "ダウンロードを開始しました！";
+                this.classList.add('clicked');
+
+                // Blob経由でダウンロードを強制する(iOS Safari対応)
+                fetch('./Shichifuku_2026.mp3')
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'Shichifuku_2026.mp3';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    })
+                    .catch(() => {
+                        // fetchが失敗した場合は通常リンクとして開く
+                        window.open('./Shichifuku_2026.mp3', '_blank');
+                    });
+
+                setTimeout(() => {
+                    this.innerText = originalText;
+                    this.classList.remove('clicked');
+                }, 2000);
+            });
+        } else {
+            // Chrome / Edge / Android Chrome / Firefox 向け(通常のdownload属性で動作)
+            downloadBtn.addEventListener('click', function() {
+                const originalText = this.innerText;
+                this.innerText = "ダウンロードを開始しました！";
+                this.classList.add('clicked');
+
+                setTimeout(() => {
+                    this.innerText = originalText;
+                    this.classList.remove('clicked');
+                }, 2000);
+            });
+        }
     </script>
 
 </body>
