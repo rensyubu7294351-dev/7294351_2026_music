@@ -101,8 +101,11 @@
             padding: 12px 24px;
             border-radius: 50px;
             font-weight: bold;
+            font-size: 1rem;
             transition: all 0.3s ease;
             width: 80%;
+            border: none;
+            cursor: pointer;
 
             /*
              * [タップ時のハイライト除去]
@@ -154,75 +157,92 @@
         <br>
 
         <!--
-            [downloadリンクについて]
-            download属性はChrome/Edge/Firefox/Android Chromeで有効。
-            iOS Safariはdownload属性を無視して新しいタブで開く仕様のため、
-            JavaScriptによるフォールバックをスクリプト側で対応。
+            [ダウンロードボタンについて]
+            LINE内WebView(LINEアプリ内ブラウザ)ではdownload属性・Blobともに動作しない。
+            対策として、ダウンロード専用パラメータ付きURLを外部ブラウザで開く方式に変更。
+            - Android: intent:// スキームでChromeを強制起動
+            - iOS: LINEの openExternalBrowser パラメータでSafariを起動
+            - 通常ブラウザからのアクセス時はそのままダウンロード開始
         -->
-        <a href="./Shichifuku_2026.mp3"
-           download="Shichifuku_2026.mp3"
-           class="download-btn"
-           id="downloadBtn">
+        <button class="download-btn" id="downloadBtn">
             曲をダウンロードする
-        </a>
+        </button>
     </div>
 
     <script>
         const downloadBtn = document.getElementById('downloadBtn');
 
+        // MP3ファイルの直リンクURL
+        const MP3_URL = 'https://rensyubu7294351-dev.github.io/7294351_2026_music/Shichifuku_2026.mp3';
+
+        // 外部ブラウザで開いた際に自動ダウンロードを開始させるパラメータ付きURL
+        const DOWNLOAD_PAGE_URL = 'https://rensyubu7294351-dev.github.io/7294351_2026_music/?download=1';
+
         /*
-         * iOS Safari判定
-         * iOS SafariはHTMLのdownload属性に非対応のため、
-         * Blob経由でのダウンロードにフォールバックする。
-         * Chrome/Edge/Android Chromeは通常のdownload属性で動作するためそのまま。
+         * 環境判定
          */
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        const ua = navigator.userAgent;
+        const isLINEWebView = /Line\//i.test(ua);
+        const isAndroid = /Android/i.test(ua);
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
 
-        if (isIOS || isSafari) {
-            downloadBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-
-                const originalText = this.innerText;
-                this.innerText = "ダウンロードを開始しました！";
-                this.classList.add('clicked');
-
-                // Blob経由でダウンロードを強制する(iOS Safari対応)
-                fetch('./Shichifuku_2026.mp3')
-                    .then(res => res.blob())
-                    .then(blob => {
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'Shichifuku_2026.mp3';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                    })
-                    .catch(() => {
-                        // fetchが失敗した場合は通常リンクとして開く
-                        window.open('./Shichifuku_2026.mp3', '_blank');
-                    });
-
-                setTimeout(() => {
-                    this.innerText = originalText;
-                    this.classList.remove('clicked');
-                }, 2000);
-            });
-        } else {
-            // Chrome / Edge / Android Chrome / Firefox 向け(通常のdownload属性で動作)
-            downloadBtn.addEventListener('click', function() {
-                const originalText = this.innerText;
-                this.innerText = "ダウンロードを開始しました！";
-                this.classList.add('clicked');
-
-                setTimeout(() => {
-                    this.innerText = originalText;
-                    this.classList.remove('clicked');
-                }, 2000);
+        /*
+         * ページ読み込み時: ?download=1 パラメータがあれば自動ダウンロード開始
+         * (外部ブラウザで開いた直後に自動的にダウンロードさせる仕組み)
+         */
+        if (new URLSearchParams(window.location.search).get('download') === '1') {
+            window.addEventListener('DOMContentLoaded', function() {
+                const a = document.createElement('a');
+                a.href = MP3_URL;
+                a.download = 'Shichifuku_2026.mp3';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             });
         }
+
+        downloadBtn.addEventListener('click', function() {
+
+            if (isLINEWebView && isAndroid) {
+                /*
+                 * Android LINE内WebView
+                 * intent:// スキームを使ってChromeを強制起動し、DOWNLOAD_PAGE_URLを開く。
+                 * ChromeがDOWNLOAD_PAGE_URLを開くと ?download=1 を検知して自動ダウンロード開始。
+                 */
+                const path = DOWNLOAD_PAGE_URL.replace('https://', '');
+                location.href = `intent://${path}#Intent;scheme=https;package=com.android.chrome;end`;
+
+            } else if (isLINEWebView && isIOS) {
+                /*
+                 * iOS LINE内WebView
+                 * LINEが提供する openExternalBrowser=1 パラメータを付与することで
+                 * LINEが自動的にSafariで開いてくれる公式の方法。
+                 * Safariで開かれた後、?download=1 を検知して自動ダウンロード開始。
+                 */
+                const separator = DOWNLOAD_PAGE_URL.includes('?') ? '&' : '?';
+                location.href = DOWNLOAD_PAGE_URL + separator + 'openExternalBrowser=1';
+
+            } else {
+                /*
+                 * 通常ブラウザ(Safari/Chrome/Edge/Android Chrome)からのアクセス
+                 * そのままダウンロード開始。
+                 */
+                const a = document.createElement('a');
+                a.href = MP3_URL;
+                a.download = 'Shichifuku_2026.mp3';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                const originalText = downloadBtn.innerText;
+                downloadBtn.innerText = 'ダウンロードを開始しました！';
+                downloadBtn.classList.add('clicked');
+                setTimeout(() => {
+                    downloadBtn.innerText = originalText;
+                    downloadBtn.classList.remove('clicked');
+                }, 2000);
+            }
+        });
     </script>
 
 </body>
